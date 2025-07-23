@@ -1,3 +1,6 @@
+"""
+opencv100本ノック Q.17 ラプラシアンフィルタ
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2

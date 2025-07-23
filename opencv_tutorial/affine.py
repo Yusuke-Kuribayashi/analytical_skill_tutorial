@@ -1,3 +1,6 @@
+"""
+opencv100本ノック Q28. アフィン変換(平行移動)
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2

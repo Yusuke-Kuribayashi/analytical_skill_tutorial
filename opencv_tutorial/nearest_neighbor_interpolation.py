@@ -1,3 +1,6 @@
+"""
+opencv100本ノック Q25. 最近傍補間/Bi-linear補間
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
