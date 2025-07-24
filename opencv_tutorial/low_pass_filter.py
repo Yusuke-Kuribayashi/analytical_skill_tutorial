@@ -16,6 +16,8 @@ def low_pass_filter(image):
 
     # フーリエ変換により、周波数空間に変換
     spectrum_image = dft2d(image)
+    # 画像の中心を移動
+    spectrum_image = transform_image(spectrum_image)  
 
     # カーネルの生成
     kernel = np.zeros_like(image, dtype=np.float32)
@@ -24,6 +26,8 @@ def low_pass_filter(image):
     # 畳み込み演算
     low_pass_image = spectrum_image * kernel
 
+    # 画像をもとに戻す
+    low_pass_image = transform_image(low_pass_image)
     # 逆フーリエ変換により、空間空間に戻す
     filtered_image = idft2d(low_pass_image)
     # filtered_image = idft(low_pass_image)
@@ -61,10 +65,19 @@ def idft2d(f_image):
 
 def spectrum_visualization(filtered_image):
     magnitude = np.abs(filtered_image)           # 振幅を取得（√(Re² + Im²)）
-    magnitude_log = np.log(magnitude + 1)           # 見やすくするために log スケールへ
-    magnitude_shifted = np.fft.fftshift(magnitude_log)
+    magnitude_log = np.log(magnitude + 1)        # 見やすくするために log スケールへ
 
-    return magnitude_shifted
+    return magnitude_log
+
+def transform_image(image):
+    H, W = image.shape[:2]
+    output = np.zeros_like(image)
+    output[H//2:, W//2:] = image[:H//2, :W//2]   # 左上
+    output[H//2:, :W//2] = image[:H//2, W//2:]   # 右上
+    output[:H//2, :W//2] = image[H//2:, W//2:]  # 右下
+    output[:H//2, W//2:] = image[H//2:, :W//2]   # 左下
+
+    return output
 
 # 解答 ######
 # DFT hyper-parameters
@@ -86,10 +99,6 @@ def dft(img):
 		for l in range(L):
 			for k in range(K):
 				G[l, k, c] = np.sum(img[..., c] * np.exp(-2j * np.pi * (x * k / K + y * l / L))) / np.sqrt(K * L)
-				#for n in range(N):
-				#    for m in range(M):
-				#        v += gray[n, m] * np.exp(-2j * np.pi * (m * k / M + n * l / N))
-				#G[l, k] = v / np.sqrt(M * N)
 
 	return G
 
@@ -114,7 +123,6 @@ def idft(G):
 	out = out.astype(np.uint8)
 
 	return out
-
 
 # LPF
 def lpf(G, ratio=0.5):
@@ -164,17 +172,11 @@ def main():
     # # ローパスフィルタの適用
     filtered_image, spectrum_image, kernel = low_pass_filter(gray_image)
     magnitude_shifted = spectrum_visualization(spectrum_image)
-    # magnitude_shifted = dft2d(gray_image)
-    # filtered_image = idft2d(magnitude_shifted)
-    # magnitude_shifted = spectrum_visualization(magnitude_shifted)
-    print(filtered_image.max(), filtered_image.min(), filtered_image.dtype)
-	
+
     # DFT
     G = dft(origin_image)
-
     # LPF
     G = lpf(G)
-
     # IDFT
     out = idft(G)
 
@@ -183,8 +185,8 @@ def main():
     # 結果の表示
     plt.subplot(1, 3, 1)
     plt.title('Original Image')
-    # plt.imshow(gray_image, cmap='gray')
-    plt.imshow(out)
+    plt.imshow(gray_image, cmap='gray')
+    # plt.imshow(out)
     
     plt.subplot(1, 3, 2)
     plt.title('Filtered Image')
@@ -192,7 +194,9 @@ def main():
     
     plt.subplot(1, 3, 3)
     plt.title('spectrum Image')
-    plt.imshow(magnitude_shifted, cmap='gray')
+    # plt.imshow(magnitude_shifted, cmap='gray')
+    plt.imshow(out, cmap='gray')
+
     
     plt.show()
 
