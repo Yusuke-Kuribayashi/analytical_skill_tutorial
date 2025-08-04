@@ -12,3 +12,4 @@ main.py
 
 # Virtual environments
 .venv
+data/
