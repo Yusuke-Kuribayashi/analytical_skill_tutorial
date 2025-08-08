@@ -9,6 +9,7 @@ wheels/
 *.toml
 uv.lock
 main.py
+models/
 
 # Virtual environments
 .venv
