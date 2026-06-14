@@ -221,6 +221,106 @@ conda run -n isaac-sim python benchmark_pointcloud_pipeline.py \
 外部サービスや固定ポートは使用しません。
 
 
+## C++ / CUDA 全パイプラインベンチマーク
+
+`cpp/pointcloud_cpp_full_pipeline_benchmark.cu` は、合成 RGBD 入力に対して次の全処理を C++ CPU と CUDA GPU で実行します。
+
+```text
+RGBD -> 点群生成 -> VoxelGrid -> RANSAC 平面除去 -> Euclidean clustering
+```
+
+GPU版は点群生成、VoxelGrid、RANSAC、平面除去、クラスタリングをGPU上で接続します。CPUへ戻すのは統計表示用の件数・クラスタ数だけです。
+
+### ビルド
+
+```bash
+conda run -n pc-gpu-bench-cuda128 make -C cpp
+```
+
+Jetson Orin Nano では次のようにGPUアーキテクチャを指定できます。
+
+```bash
+make -C cpp ARCH=sm_87
+```
+
+### 実行コマンド
+
+```bash
+conda run -n pc-gpu-bench-cuda128 ./cpp/pointcloud_cpp_full_pipeline_benchmark \
+  --width 640 \
+  --height 480 \
+  --fx 550 \
+  --fy 550 \
+  --runs 11 \
+  --warmup-runs 2 \
+  --ransac-iterations 256 \
+  --cluster-iterations 64 \
+  --voxel-size 0.03 \
+  --cluster-tolerance 0.05 \
+  --cluster-min-size 20
+```
+
+### 現在環境での実測結果
+
+RTX 4070 / CUDA 12.8 環境で、`ransac-iterations=256`, `cluster-iterations=64`, `voxel-size=0.03`, `runs=11`, `warmup-runs=2` により計測した結果です。CPUとGPUで `generated`, `downsampled`, `remaining`, `clusters` が一致することを確認しています。
+
+| 解像度 | C++ CPU pipeline mean | CUDA pipeline mean | GPU/CPU |
+|---|---:|---:|---:|
+| 320x240 | 2.354 ms | 3.685 ms | 0.64x |
+| 640x480 | 11.482 ms | 7.375 ms | 1.56x |
+| 1280x720 | 29.433 ms | 7.420 ms | 3.97x |
+| 1920x1080 | 72.263 ms | 12.082 ms | 5.98x |
+
+小さい入力ではGPU初期化やThrustのsort/reduceの固定費が目立つため、CPUの方が速い場合があります。入力が大きくなるほど点群生成とVoxelGridの並列化が効き、GPU版が有利になります。
+
+## C++ / CUDA 点群生成ベンチマーク
+
+`cpp/pointcloud_cpp_benchmark.cu` は、合成 RGBD 入力から dense 形式の `Point6 [x, y, z, r, g, b]` 点群を生成し、C++ CPU 実装と CUDA GPU 実装の速度を比較します。GPU は入力をGPUに置いたまま計算する `cuda_kernel_resident` と、Host→Device転送を含む `cuda_h2d_kernel_count` を分けて計測します。
+
+### ビルド
+
+```bash
+conda run -n pc-gpu-bench-cuda128 make -C cpp
+```
+
+Jetson Orin Nano でビルドする場合は、GPUアーキテクチャを明示できます。
+
+```bash
+make -C cpp ARCH=sm_87
+```
+
+### 実行コマンド
+
+```bash
+conda run -n pc-gpu-bench-cuda128 ./cpp/pointcloud_cpp_benchmark \
+  --width 1280 \
+  --height 720 \
+  --fx 1100 \
+  --fy 1100 \
+  --runs 31 \
+  --warmup-runs 5
+```
+
+### 主要なオプション
+
+- `--width`, `--height`: 合成 RGBD の解像度。
+- `--fx`, `--fy`, `--cx`, `--cy`: カメラ内部パラメータ。`cx`, `cy` は省略時に画像中心を使用します。
+- `--min-depth`, `--max-depth`: 点群化する depth 範囲。単位はメートルです。
+- `--runs`: 総実行回数。
+- `--warmup-runs`: 統計から除外する先頭実行回数。
+
+### 現在環境での実測結果
+
+RTX 4070 / CUDA 12.8 環境で、`runs=31`, `warmup-runs=5` により計測した結果です。
+
+| 解像度 | C++ CPU dense mean | CUDA kernel resident mean | CUDA H2D+kernel+count mean |
+|---|---:|---:|---:|
+| 640x480 | 0.945 ms | 0.030 ms | 0.228 ms |
+| 1280x720 | 1.660 ms | 0.082 ms | 0.539 ms |
+| 1920x1080 | 4.776 ms | 0.185 ms | 1.139 ms |
+
+GPU常駐で後段処理までつなげられる場合は `cuda_kernel_resident` が近い見積もりです。CPU側へ毎回データを戻す、またはRGBDを毎回CPUからGPUへ送る構成では、転送を含む値を基準にしてください。
+
 ## ファイル構成
 
 - `docs/specification.md`: 仕様駆動開発/TDD の基準仕様。入出力、受け入れ基準、ベンチマーク条件を記載します。
@@ -233,4 +333,6 @@ conda run -n isaac-sim python benchmark_pointcloud_pipeline.py \
 - `pointcloud_pipeline_benchmark.py`: ステージ別・パイプライン全体の計測、統計計算、JSON 保存を行います。
 - `run_pointcloud_pipeline.py`: パイプラインを実行してクラスタ色付き点群 NPY/PLY を保存する CLI です。
 - `benchmark_pointcloud_pipeline.py`: パイプラインベンチマーク CLI です。
+- `cpp/pointcloud_cpp_benchmark.cu`: C++ CPU と CUDA GPU の RGBD 点群生成ベンチマークです。
+- `cpp/pointcloud_cpp_full_pipeline_benchmark.cu`: C++ CPU と CUDA GPU の全点群処理パイプラインベンチマークです。
 - `tests/test_pointcloud_cpu_algorithms.py`: 小さな合成データで仕様を固定する pytest です。

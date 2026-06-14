@@ -3,3 +3,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 outputs/
+cpp/pointcloud_cpp_benchmark
+cpp/pointcloud_cpp_full_pipeline_benchmark
