@@ -1,0 +1,21 @@
+name: pc-gpu-bench-cuda128
+channels:
+  - conda-forge
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pillow
+  - numba
+  - llvmlite
+  - cuda-version=12.8
+  - cuda-cudart=12.8
+  - cuda-nvcc=12.8
+  - cuda-nvrtc=12.8
+  - cuda-nvvm=12.8
+  - libcublas=12.8
+  - pip
+  - pip:
+      - cupy-cuda12x
+      - open3d
